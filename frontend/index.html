@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Root | Federated RAG Intelligence</title>
+    <meta name="description" content="Root is a federated RAG platform that enables privacy-preserving AI across distributed data sources. Train on private data without moving it." />
+    <meta name="keywords" content="federated learning, RAG, privacy-preserving AI, distributed AI, vector search, enterprise AI" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Root | Federated RAG Intelligence" />
+    <meta property="og:description" content="Train on distributed private data without moving it. Federated intelligence for the RAG era." />
+    <meta property="og:site_name" content="Root Systems" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Root | Federated RAG Intelligence" />
+    <meta name="twitter:description" content="Train on distributed private data without moving it. Federated intelligence for the RAG era." />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Manrope', 'sans-serif'],
+            },
+            colors: {
+              root: {
+                bg: '#050a0a',
+                card: '#0a1414',
+                accent: '#ccff00',
+                accentHover: '#b3e600',
+                text: '#e2e8f0',
+                muted: '#94a3b8'
+              }
+            },
+            animation: {
+                'fade-in-up': 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                'fade-in-up-delayed': 'fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards',
+                'fade-in': 'fadeIn 1s ease-out 1s forwards',
+            },
+            keyframes: {
+                fadeInUp: {
+                    '0%': { opacity: '0', transform: 'translateY(40px)' },
+                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                },
+                fadeIn: {
+                    '0%': { opacity: '0' },
+                    '100%': { opacity: '1' },
+                }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      html {
+        scroll-behavior: auto;
+      }
+      body {
+        background-color: #050a0a;
+        color: #e2e8f0;
+        overflow-x: hidden;
+      }
+      html {
+        overflow-x: hidden;
+      }
+      /* Custom scrollbar to match the dark theme */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #050a0a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1e293b;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #334155;
+      }
+      
+      .text-glow {
+        text-shadow: 0 0 20px rgba(204, 255, 0, 0.3);
+      }
+      
+      .perspective-1000 {
+        perspective: 1000px;
+      }
+
+      /* Focus visible indicators for accessibility */
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible,
+      [role="button"]:focus-visible {
+        outline: 2px solid #ccff00;
+        outline-offset: 2px;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.6.1?external=react,react-dom",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "gsap": "https://esm.sh/gsap@3.12.5",
+    "gsap/": "https://esm.sh/gsap@3.12.5/",
+    "@gsap/react": "https://esm.sh/@gsap/react@2.1.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

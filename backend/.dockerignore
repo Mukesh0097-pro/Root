@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+*.md
+tmpclaude-*
+uploads/
+faiss_indexes/
