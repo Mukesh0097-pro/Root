@@ -10,7 +10,7 @@ if "supabase" in settings.DATABASE_URL:
     ssl_context.verify_mode = ssl.CERT_NONE
     connect_args["ssl"] = ssl_context
     # Required for Supabase connection pooler (pgBouncer)
-    connect_args["prepared_statement_cache_size"] = 0
+    connect_args["statement_cache_size"] = 0
 
 engine = create_async_engine(
     settings.DATABASE_URL,
