@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, ChevronDown } from 'lucide-react';
 import type { Department } from '../lib/types';
 import { api } from '../lib/api';
 
+const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
+
 export default function Signup() {
-  const { register, isAuthenticated, error, clearError } = useAuth();
+  const { register, googleLogin, isAuthenticated, error, clearError } = useAuth();
   const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState('');
@@ -18,6 +20,8 @@ export default function Signup() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeptOpen, setIsDeptOpen] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isAuthenticated) navigate('/app/chat', { replace: true });
@@ -26,10 +30,66 @@ export default function Signup() {
   useEffect(() => {
     api.fetch<Department[]>('/auth/departments')
       .then(setDepartments)
-      .catch(() => {});
+      .catch((err: unknown) => {
+        console.error('Failed to fetch departments:', err);
+      });
   }, []);
 
   const selectedDept = departments.find((d) => d.code === departmentCode);
+
+  // Google Sign-In handler
+  const handleGoogleResponse = useCallback(async (response: { credential: string }) => {
+    setIsGoogleLoading(true);
+    clearError();
+    try {
+      await googleLogin(response.credential);
+      navigate('/app/chat', { replace: true });
+    } catch {
+      // Error handled by AuthContext
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  }, [googleLogin, clearError, navigate]);
+
+  // Initialize Google Sign-In button
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !googleButtonRef.current) return;
+
+    const initializeGoogle = () => {
+      if (!(window as any).google?.accounts?.id) return;
+
+      (window as any).google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleResponse,
+      });
+
+      (window as any).google.accounts.id.renderButton(googleButtonRef.current!, {
+        theme: 'filled_black',
+        size: 'large',
+        width: 400,
+        type: 'standard',
+        shape: 'rectangular',
+        text: 'signup_with',
+        logo_alignment: 'left',
+      });
+    };
+
+    if ((window as any).google?.accounts?.id) {
+      initializeGoogle();
+    } else {
+      const interval = setInterval(() => {
+        if ((window as any).google?.accounts?.id) {
+          clearInterval(interval);
+          initializeGoogle();
+        }
+      }, 100);
+      const timeout = setTimeout(() => clearInterval(interval), 10000);
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [handleGoogleResponse]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,11 +233,10 @@ export default function Signup() {
                           setIsDeptOpen(false);
                           clearError();
                         }}
-                        className={`w-full text-left px-4 py-3 text-sm transition-colors ${
-                          dept.code === departmentCode
+                        className={`w-full text-left px-4 py-3 text-sm transition-colors ${dept.code === departmentCode
                             ? 'bg-root-accent/10 text-root-accent'
                             : 'text-root-text hover:bg-white/5'
-                        }`}
+                          }`}
                       >
                         {dept.name}
                       </button>
@@ -195,6 +254,27 @@ export default function Signup() {
               {isSubmitting ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
+
+          {GOOGLE_CLIENT_ID && (
+            <>
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-root-muted text-xs uppercase tracking-wider">or</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              <div className="flex justify-center">
+                {isGoogleLoading ? (
+                  <div className="flex items-center gap-2 py-3 text-root-muted text-sm">
+                    <div className="w-4 h-4 border-2 border-root-accent border-t-transparent rounded-full animate-spin" />
+                    Signing up with Google...
+                  </div>
+                ) : (
+                  <div ref={googleButtonRef} />
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="text-center mt-6 space-y-2">
