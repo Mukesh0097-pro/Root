@@ -16,9 +16,13 @@ from .routers import federation as federation_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Try to create tables on startup, but don't fail if DB is slow
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ Database tables verified")
+    except Exception as e:
+        print(f"⚠️ Could not verify tables on startup (tables may already exist): {e}")
 
     # Ensure upload and FAISS directories exist
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
