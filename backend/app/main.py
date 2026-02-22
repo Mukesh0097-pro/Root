@@ -49,3 +49,17 @@ app.include_router(federation_router.router, prefix="/api", tags=["federation"])
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/health/db")
+async def db_health_check():
+    """Test the database connection."""
+    from sqlalchemy import text
+    from .database import async_session
+    try:
+        async with async_session() as session:
+            result = await session.execute(text("SELECT 1"))
+            row = result.scalar()
+            return {"status": "ok", "db": "connected", "result": row}
+    except Exception as e:
+        return {"status": "error", "db": "failed", "error": str(e)}

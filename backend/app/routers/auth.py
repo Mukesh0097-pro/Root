@@ -249,6 +249,11 @@ async def get_me(
 
 @router.get("/departments", response_model=list[DepartmentResponse])
 async def list_departments(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Department).order_by(Department.name))
-    departments = result.scalars().all()
-    return [DepartmentResponse.model_validate(d) for d in departments]
+    try:
+        result = await db.execute(select(Department).order_by(Department.name))
+        departments = result.scalars().all()
+        return [DepartmentResponse.model_validate(d) for d in departments]
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
