@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = str(Path(__file__).resolve().parent.parent / "uploads")
     FAISS_DIR: str = str(Path(__file__).resolve().parent.parent / "faiss_indexes")
     GOOGLE_CLIENT_ID: str = ""
+    ALLOWED_ORIGINS: str = "http://localhost:3000"  # comma-separated for multiple origins
 
     model_config = {
         "env_file": str(Path(__file__).resolve().parent.parent.parent / ".env.local"),
