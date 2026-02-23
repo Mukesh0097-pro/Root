@@ -27,12 +27,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
       return;
     }
+
+    // Try to restore cached user first for instant UI
+    const cachedUser = localStorage.getItem('user_data');
+    if (cachedUser) {
+      try {
+        setUser(JSON.parse(cachedUser));
+      } catch { }
+    }
+
     try {
       const userData = await api.fetch<User>('/auth/me');
       setUser(userData);
-    } catch {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      localStorage.setItem('user_data', JSON.stringify(userData));
+    } catch (err) {
+      // Only clear tokens on explicit auth failure (401), not network errors
+      if (err instanceof ApiError && err.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_data');
+        setUser(null);
+      }
+      // On network errors (Render cold start, timeout), keep the user logged in
+      // The cached user data will still be shown
     } finally {
       setIsLoading(false);
     }
@@ -51,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
+      localStorage.setItem('user_data', JSON.stringify(data.user));
       setUser(data.user);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Login failed';
@@ -68,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       localStorage.setItem('access_token', resp.access_token);
       localStorage.setItem('refresh_token', resp.refresh_token);
+      localStorage.setItem('user_data', JSON.stringify(resp.user));
       setUser(resp.user);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Registration failed';
@@ -85,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       localStorage.setItem('access_token', resp.access_token);
       localStorage.setItem('refresh_token', resp.refresh_token);
+      localStorage.setItem('user_data', JSON.stringify(resp.user));
       setUser(resp.user);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Google sign-in failed';
@@ -96,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_data');
     setUser(null);
   };
 

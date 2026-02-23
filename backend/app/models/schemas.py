@@ -42,6 +42,7 @@ class UserResponse(BaseModel):
     department_id: uuid.UUID
     department_name: Optional[str] = None
     is_active: bool
+    plan: str = "free"
     created_at: datetime
     last_login: Optional[datetime] = None
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Settings, Shield } from 'lucide-react';
+import { Menu, X, LogOut, Settings, Shield, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export function AppLayout() {
@@ -41,6 +41,13 @@ export function AppLayout() {
               Admin
             </Link>
           )}
+          <Link
+            to="/app/billing"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-root-muted hover:text-root-accent border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+          >
+            <CreditCard size={14} />
+            <span className="hidden sm:inline">Billing</span>
+          </Link>
           <Link to="/app/admin" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
             <div className="w-8 h-8 rounded-full bg-root-accent/20 flex items-center justify-center text-root-accent text-sm font-bold">
               {user?.first_name?.[0]}{user?.last_name?.[0]}
@@ -74,6 +81,7 @@ export function AppLayout() {
             </div>
             <nav className="p-4 flex flex-col gap-2">
               <Link to="/app/chat" onClick={() => setShowMobileMenu(false)} className="px-3 py-2 rounded-lg text-root-text hover:bg-white/5">Chat</Link>
+              <Link to="/app/billing" onClick={() => setShowMobileMenu(false)} className="px-3 py-2 rounded-lg text-root-text hover:bg-white/5">Billing & Plans</Link>
               {isAdmin && (
                 <Link to="/app/admin" onClick={() => setShowMobileMenu(false)} className="px-3 py-2 rounded-lg text-root-text hover:bg-white/5">Admin Dashboard</Link>
               )}

@@ -34,6 +34,14 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     last_login: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
+    # Subscription fields
+    plan: Mapped[str] = mapped_column(String(20), default="free")  # free, pro, business
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    plan_expires_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    queries_today: Mapped[int] = mapped_column(Integer, default=0)
+    queries_reset_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
 
 class Document(Base):
     __tablename__ = "documents"

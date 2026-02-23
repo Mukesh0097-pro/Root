@@ -7,6 +7,7 @@ import Platform from './pages/Platform';
 import Research from './pages/Research';
 import Company from './pages/Company';
 import ContactPage from './pages/Contact';
+import Pricing from './pages/Pricing';
 import NotFound from './pages/NotFound';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -25,6 +26,7 @@ import AdminDashboard from './app/pages/AdminDashboard';
 import AdminDocuments from './app/pages/AdminDocuments';
 import AdminUsers from './app/pages/AdminUsers';
 import AdminAnalytics from './app/pages/AdminAnalytics';
+import Billing from './app/pages/Billing';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -96,6 +98,7 @@ function App() {
         <Route path="/research" element={<main><Research /></main>} />
         <Route path="/company" element={<main><Company /></main>} />
         <Route path="/contact" element={<main><ContactPage /></main>} />
+        <Route path="/pricing" element={<main><Pricing /></main>} />
 
         {/* Platform routes */}
         <Route path="/app/login" element={
@@ -124,6 +127,7 @@ function App() {
           <Route index element={<Chat />} />
           <Route path="chat" element={<Chat />} />
           <Route path="chat/:conversationId" element={<Chat />} />
+          <Route path="billing" element={<Billing />} />
           <Route path="admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="documents" element={<AdminDocuments />} />

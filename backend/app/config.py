@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     ALLOWED_ORIGINS: str = "http://localhost:3000"  # comma-separated for multiple origins
 
+    # Stripe
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
+    # Plan limits
+    FREE_QUERIES_PER_DAY: int = 5
+    FREE_MAX_DOCUMENTS: int = 3
+    PRO_QUERIES_PER_DAY: int = 1000
+    PRO_MAX_DOCUMENTS: int = 50
+
     model_config = {
         "env_file": str(Path(__file__).resolve().parent.parent.parent / ".env.local"),
         "extra": "ignore",

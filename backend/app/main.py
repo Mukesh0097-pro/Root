@@ -12,6 +12,7 @@ from .routers import chat as chat_router
 from .routers import documents as documents_router
 from .routers import admin as admin_router
 from .routers import federation as federation_router
+from .routers import payments as payments_router
 
 
 @asynccontextmanager
@@ -48,6 +49,7 @@ app.include_router(chat_router.router, prefix="/api", tags=["chat"])
 app.include_router(documents_router.router, prefix="/api", tags=["documents"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
 app.include_router(federation_router.router, prefix="/api", tags=["federation"])
+app.include_router(payments_router.router, prefix="/api/payments", tags=["payments"])
 
 
 @app.get("/api/health")
