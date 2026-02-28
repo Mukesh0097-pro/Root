@@ -205,7 +205,10 @@ async def create_checkout_session(
 ):
     """Create a Stripe Checkout Session for upgrading."""
     if not settings.STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=500, detail="Stripe is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Stripe payments are not configured on this server. Please set STRIPE_SECRET_KEY in your environment."
+        )
 
     if req.plan not in ["pro", "business"]:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -257,16 +260,34 @@ async def create_portal_session(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a Stripe Customer Portal session for managing subscription."""
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Stripe is not configured on this server."
+        )
+
     if not current_user.stripe_customer_id:
-        raise HTTPException(status_code=400, detail="No active subscription")
+        raise HTTPException(status_code=400, detail="No active subscription found.")
 
     frontend_url = settings.ALLOWED_ORIGINS.split(",")[0].strip()
 
-    session = stripe.billing_portal.Session.create(
-        customer=current_user.stripe_customer_id,
-        return_url=f"{frontend_url}/app/billing",
-    )
-    return {"portal_url": session.url}
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=current_user.stripe_customer_id,
+            return_url=f"{frontend_url}/app/billing",
+        )
+        return {"portal_url": session.url}
+    except stripe.error.InvalidRequestError as e:
+        # Usually means the Customer Portal is not configured in Stripe dashboard
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The Stripe Customer Portal is not configured. "
+                "Please enable it at: https://dashboard.stripe.com/settings/billing/portal"
+            )
+        )
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=502, detail=f"Stripe error: {str(e.user_message or e)}")
 
 
 @router.post("/webhook")

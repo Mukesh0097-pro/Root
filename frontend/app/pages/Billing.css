@@ -53,6 +53,12 @@
   color: #c8ff00;
 }
 
+.billing-banner--error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
 /* Header */
 .billing-header {
   margin-bottom: 32px;

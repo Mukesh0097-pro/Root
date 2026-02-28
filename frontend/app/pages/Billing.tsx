@@ -27,6 +27,7 @@ export default function Billing() {
     const [loading, setLoading] = useState(true);
     const [upgrading, setUpgrading] = useState<string | null>(null);
     const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
@@ -53,6 +54,7 @@ export default function Billing() {
     }
 
     async function handleUpgrade(planId: string) {
+        setErrorMsg(null);
         setUpgrading(planId);
         try {
             const { checkout_url } = await api.fetch<{ checkout_url: string }>(
@@ -64,13 +66,14 @@ export default function Billing() {
             );
             window.location.href = checkout_url;
         } catch (error: any) {
-            alert(error.message || 'Failed to create checkout session');
+            setErrorMsg(error.message || 'Failed to create checkout session. Please try again.');
         } finally {
             setUpgrading(null);
         }
     }
 
     async function handleManageBilling() {
+        setErrorMsg(null);
         try {
             const { portal_url } = await api.fetch<{ portal_url: string }>(
                 '/payments/create-portal',
@@ -78,7 +81,11 @@ export default function Billing() {
             );
             window.location.href = portal_url;
         } catch (error: any) {
-            alert(error.message || 'Failed to open billing portal');
+            setErrorMsg(
+                error.message?.includes('not configured')
+                    ? '⚙️ The Stripe Customer Portal is not yet configured. Please visit: Stripe Dashboard → Settings → Billing → Customer Portal to enable it.'
+                    : (error.message || 'Failed to open billing portal.')
+            );
         }
     }
 
@@ -113,6 +120,17 @@ export default function Billing() {
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
                     <span>Payment was cancelled. You can upgrade anytime.</span>
+                </div>
+            )}
+            {errorMsg && (
+                <div className="billing-banner billing-banner--error" style={{ cursor: 'pointer' }} onClick={() => setErrorMsg(null)}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span>{errorMsg}</span>
+                    <span style={{ marginLeft: 'auto', opacity: 0.6, fontSize: '0.75rem' }}>Click to dismiss</span>
                 </div>
             )}
 

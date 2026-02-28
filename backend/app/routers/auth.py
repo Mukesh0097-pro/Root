@@ -119,11 +119,20 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 @router.post("/google", response_model=LoginResponse)
 async def google_auth(req: GoogleAuthRequest, db: AsyncSession = Depends(get_db)):
     """Authenticate or register a user via Google ID token."""
-    from google.oauth2 import id_token as google_id_token
-    from google.auth.transport import requests as google_requests
-
     if not settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="Google Sign-In is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Google Sign-In is not configured on this server. Please set GOOGLE_CLIENT_ID in the backend .env.local file.",
+        )
+
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Google auth library not installed. Run: pip install google-auth",
+        )
 
     try:
         idinfo = google_id_token.verify_oauth2_token(
