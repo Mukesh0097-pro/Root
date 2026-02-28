@@ -96,18 +96,29 @@ async def get_or_create_stripe_price(plan_id: str, interval: str = "month") -> s
     if plan_id == "free":
         return ""
 
+    # --- Use hardcoded Price IDs from env vars if available (most reliable) ---
+    price_id_map = {
+        ("pro", "month"):     settings.STRIPE_PRICE_PRO_MONTHLY,
+        ("pro", "year"):      settings.STRIPE_PRICE_PRO_YEARLY,
+        ("business", "month"): settings.STRIPE_PRICE_BUSINESS_MONTHLY,
+        ("business", "year"):  settings.STRIPE_PRICE_BUSINESS_YEARLY,
+    }
+    hardcoded = price_id_map.get((plan_id, interval), "")
+    if hardcoded:
+        return hardcoded
+
+    # --- Fallback: dynamically find or create product/price in Stripe ---
     config = PLAN_CONFIG[plan_id]
     amount = config["price_monthly"]
 
-    # For yearly, give 20% discount
     if interval == "year":
         amount = int(amount * 12 * 0.8)  # 20% off yearly
 
-    # Search for existing product
-    products = stripe.Product.list(limit=10)
+    # Search existing products (fetch all pages to avoid missing anything)
     product = None
-    for p in products.data:
-        if p.metadata.get("plan_id") == plan_id:
+    products = stripe.Product.list(limit=100)
+    for p in products.auto_paging_iter():
+        if p.metadata.get("plan_id") == plan_id and p.active:
             product = p
             break
 
@@ -118,9 +129,9 @@ async def get_or_create_stripe_price(plan_id: str, interval: str = "month") -> s
         )
 
     # Search for matching price
-    prices = stripe.Price.list(product=product.id, active=True, limit=10)
-    for price in prices.data:
-        if price.unit_amount == amount and price.recurring.interval == interval:
+    prices = stripe.Price.list(product=product.id, active=True, limit=100)
+    for price in prices.auto_paging_iter():
+        if price.unit_amount == amount and price.recurring and price.recurring.interval == interval:
             return price.id
 
     # Create new price
@@ -131,6 +142,7 @@ async def get_or_create_stripe_price(plan_id: str, interval: str = "month") -> s
         recurring={"interval": interval},
     )
     return price.id
+
 
 
 # --- Routes ---

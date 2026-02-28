@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+    # Optional: set these directly from Stripe Dashboard to avoid dynamic price lookup
+    STRIPE_PRICE_PRO_MONTHLY: str = ""
+    STRIPE_PRICE_PRO_YEARLY: str = ""
+    STRIPE_PRICE_BUSINESS_MONTHLY: str = ""
+    STRIPE_PRICE_BUSINESS_YEARLY: str = ""
 
     @property
     def stripe_frontend_url(self) -> str:
