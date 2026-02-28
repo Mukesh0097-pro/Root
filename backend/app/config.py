@@ -12,11 +12,19 @@ class Settings(BaseSettings):
     FAISS_DIR: str = str(Path(__file__).resolve().parent.parent / "faiss_indexes")
     GOOGLE_CLIENT_ID: str = ""
     ALLOWED_ORIGINS: str = "http://localhost:3000"  # comma-separated for multiple origins
+    FRONTEND_URL: str = ""  # Explicit frontend URL for Stripe redirects (overrides ALLOWED_ORIGINS)
 
     # Stripe
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+
+    @property
+    def stripe_frontend_url(self) -> str:
+        """Returns the frontend URL to use in Stripe success/cancel redirects."""
+        if self.FRONTEND_URL:
+            return self.FRONTEND_URL.rstrip("/")
+        return self.ALLOWED_ORIGINS.split(",")[0].strip().rstrip("/")
 
     # Plan limits
     FREE_QUERIES_PER_DAY: int = 5

@@ -231,7 +231,7 @@ async def create_checkout_session(
     price_id = await get_or_create_stripe_price(req.plan, interval)
 
     # Determine success/cancel URLs
-    frontend_url = settings.ALLOWED_ORIGINS.split(",")[0].strip()
+    frontend_url = settings.stripe_frontend_url
 
     session = stripe.checkout.Session.create(
         customer=current_user.stripe_customer_id,
@@ -269,7 +269,7 @@ async def create_portal_session(
     if not current_user.stripe_customer_id:
         raise HTTPException(status_code=400, detail="No active subscription found.")
 
-    frontend_url = settings.ALLOWED_ORIGINS.split(",")[0].strip()
+    frontend_url = settings.stripe_frontend_url
 
     try:
         session = stripe.billing_portal.Session.create(
