@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useAnalytics } from '../hooks/useAdmin';
+import { useAnalytics, useKnowledgeGaps } from '../hooks/useAdmin';
 import { AnalyticsCharts } from '../components/admin/AnalyticsCharts';
-import { Loader } from 'lucide-react';
+import { Loader, Download, AlertTriangle } from 'lucide-react';
+import { api } from '../lib/api';
 
 const PERIODS = [
   { value: '7d', label: '7 Days' },
@@ -14,6 +15,20 @@ export default function AdminAnalytics() {
   const { user } = useAuth();
   const [period, setPeriod] = useState('30d');
   const { data, isLoading } = useAnalytics(user?.department_id || '', period);
+  const { gaps } = useKnowledgeGaps(user?.department_id || '');
+
+  const handleExportCSV = async () => {
+    try {
+      const response = await api.rawFetch(`/admin/analytics/export?department_id=${user?.department_id}&period=${period}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analytics_${period}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* silent */ }
+  };
 
   return (
     <div className="max-w-6xl">
@@ -22,20 +37,29 @@ export default function AdminAnalytics() {
           <h1 className="text-2xl font-bold text-white">Analytics</h1>
           <p className="text-root-muted text-sm mt-1">Department activity and performance</p>
         </div>
-        <div className="flex items-center gap-1 bg-root-card border border-white/10 rounded-lg p-1">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
-                period === p.value
-                  ? 'bg-root-accent text-root-bg'
-                  : 'text-root-muted hover:text-white'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-3 py-1.5 bg-root-card border border-white/10 rounded-lg text-sm text-root-text hover:border-root-accent/30 transition-colors"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+          <div className="flex items-center gap-1 bg-root-card border border-white/10 rounded-lg p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPeriod(p.value)}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
+                  period === p.value
+                    ? 'bg-root-accent text-root-bg'
+                    : 'text-root-muted hover:text-white'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -62,6 +86,34 @@ export default function AdminAnalytics() {
               </div>
             ) : (
               <p className="text-root-muted text-sm text-center py-8">No queries yet</p>
+            )}
+          </div>
+
+          {/* Knowledge Gaps */}
+          <div className="mt-6 bg-root-card border border-white/10 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle size={16} className="text-orange-400" />
+              <h3 className="text-sm font-bold text-white">Knowledge Gaps</h3>
+              <span className="text-xs text-root-muted">(Low confidence responses)</span>
+            </div>
+            {gaps.length > 0 ? (
+              <div className="flex flex-col">
+                {gaps.map((gap, i) => (
+                  <div key={i} className="flex items-center gap-4 py-2.5 border-b border-white/5 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-root-text truncate">{gap.query}</p>
+                      <p className="text-xs text-root-muted mt-0.5">
+                        {new Date(gap.timestamp).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`text-sm font-bold ${gap.confidence < 30 ? 'text-red-400' : 'text-orange-400'}`}>
+                      {gap.confidence}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-root-muted text-sm text-center py-8">No knowledge gaps detected</p>
             )}
           </div>
 

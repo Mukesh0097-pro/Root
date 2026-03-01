@@ -31,11 +31,34 @@ class Settings(BaseSettings):
             return self.FRONTEND_URL.rstrip("/")
         return self.ALLOWED_ORIGINS.split(",")[0].strip().rstrip("/")
 
+    # Rate limiting (requests per 60-second window)
+    RATE_LIMIT_AUTH: int = 20       # login/register/forgot-password
+    RATE_LIMIT_QUERY: int = 60      # chat/query endpoints
+    RATE_LIMIT_GENERAL: int = 120   # all other API endpoints
+
     # Plan limits
     FREE_QUERIES_PER_DAY: int = 5
     FREE_MAX_DOCUMENTS: int = 3
     PRO_QUERIES_PER_DAY: int = 1000
     PRO_MAX_DOCUMENTS: int = 50
+
+    # Email
+    EMAIL_BACKEND: str = "console"  # console, smtp, sendgrid
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = "noreply@fedknowledge.com"
+    SENDGRID_API_KEY: str = ""
+    SENDGRID_FROM: str = "noreply@fedknowledge.com"
+
+    # Storage
+    STORAGE_BACKEND: str = "local"  # local, s3
+    S3_BUCKET: str = ""
+    S3_REGION: str = "ap-southeast-1"
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_ENDPOINT_URL: str = ""  # for S3-compatible services (MinIO, DigitalOcean Spaces)
 
     model_config = {
         "env_file": str(Path(__file__).resolve().parent.parent.parent / ".env.local"),

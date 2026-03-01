@@ -27,6 +27,25 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class MFAVerifyRequest(BaseModel):
+    code: str  # 6-digit TOTP code
+
+
+class MFALoginRequest(BaseModel):
+    email: str
+    password: str
+    mfa_code: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
@@ -92,6 +111,7 @@ class DocumentResponse(BaseModel):
     status: str
     chunk_count: int
     error_message: Optional[str] = None
+    is_archived: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -110,6 +130,7 @@ class ConversationResponse(BaseModel):
     id: uuid.UUID
     title: str
     department_id: uuid.UUID
+    is_starred: bool = False
     created_at: datetime
     updated_at: datetime
     message_count: int = 0

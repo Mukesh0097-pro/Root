@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -7,14 +8,47 @@ import numpy as np
 
 from ..config import settings
 
+logger = logging.getLogger(__name__)
+
 
 class VectorStore:
-    """Per-department FAISS index with metadata stored as JSON sidecar."""
+    """Per-department FAISS index with metadata stored as JSON sidecar.
+
+    Supports S3 persistence: writes locally first (fast), then uploads to S3.
+    On load, checks local disk first, falls back to S3 download.
+    This ensures indexes survive Render's ephemeral filesystem.
+    """
 
     def __init__(self):
         self._indexes: dict[str, faiss.IndexIDMap] = {}
         self._metadata: dict[str, dict[str, dict]] = {}  # dept_id -> {str(faiss_id) -> chunk_meta}
         self._next_ids: dict[str, int] = {}
+        self._s3_client = None
+
+    def _get_s3_client(self):
+        """Lazy-init S3 client for FAISS persistence."""
+        if self._s3_client is not None:
+            return self._s3_client
+        if settings.STORAGE_BACKEND.lower() != "s3":
+            return None
+        try:
+            import boto3
+            kwargs = {
+                "aws_access_key_id": settings.S3_ACCESS_KEY,
+                "aws_secret_access_key": settings.S3_SECRET_KEY,
+                "region_name": settings.S3_REGION,
+            }
+            if settings.S3_ENDPOINT_URL:
+                kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
+            self._s3_client = boto3.client("s3", **kwargs)
+            return self._s3_client
+        except ImportError:
+            logger.warning("boto3 not installed — FAISS S3 persistence disabled")
+            return None
+
+    def _s3_key(self, filename: str) -> str:
+        """S3 key for FAISS files, stored under faiss/ prefix."""
+        return f"faiss/{filename}"
 
     def _index_path(self, department_id: str) -> Path:
         return Path(settings.FAISS_DIR) / f"{department_id}.index"
@@ -22,12 +56,48 @@ class VectorStore:
     def _meta_path(self, department_id: str) -> Path:
         return Path(settings.FAISS_DIR) / f"{department_id}.meta.json"
 
+    def _download_from_s3(self, local_path: Path, s3_filename: str) -> bool:
+        """Download a file from S3 to local path. Returns True on success."""
+        client = self._get_s3_client()
+        if client is None:
+            return False
+        try:
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            client.download_file(settings.S3_BUCKET, self._s3_key(s3_filename), str(local_path))
+            logger.info(f"Downloaded {s3_filename} from S3")
+            return True
+        except Exception as e:
+            logger.debug(f"S3 download failed for {s3_filename}: {e}")
+            return False
+
+    def _upload_to_s3(self, local_path: Path, s3_filename: str) -> bool:
+        """Upload a local file to S3. Returns True on success."""
+        client = self._get_s3_client()
+        if client is None:
+            return False
+        try:
+            client.upload_file(str(local_path), settings.S3_BUCKET, self._s3_key(s3_filename))
+            logger.info(f"Uploaded {s3_filename} to S3")
+            return True
+        except Exception as e:
+            logger.error(f"S3 upload failed for {s3_filename}: {e}")
+            return False
+
     def _load_or_create(self, department_id: str) -> None:
         if department_id in self._indexes:
             return
 
         index_path = self._index_path(department_id)
         meta_path = self._meta_path(department_id)
+
+        index_file = f"{department_id}.index"
+        meta_file = f"{department_id}.meta.json"
+
+        # Try local first
+        if not (index_path.exists() and meta_path.exists()):
+            # Try downloading from S3
+            self._download_from_s3(index_path, index_file)
+            self._download_from_s3(meta_path, meta_file)
 
         if index_path.exists() and meta_path.exists():
             self._indexes[department_id] = faiss.read_index(str(index_path))
@@ -45,9 +115,20 @@ class VectorStore:
 
     def _save(self, department_id: str) -> None:
         Path(settings.FAISS_DIR).mkdir(parents=True, exist_ok=True)
-        faiss.write_index(self._indexes[department_id], str(self._index_path(department_id)))
-        with open(self._meta_path(department_id), "w") as f:
+
+        index_path = self._index_path(department_id)
+        meta_path = self._meta_path(department_id)
+
+        # Save locally first
+        faiss.write_index(self._indexes[department_id], str(index_path))
+        with open(meta_path, "w") as f:
             json.dump(self._metadata[department_id], f)
+
+        # Upload to S3 for persistence
+        index_file = f"{department_id}.index"
+        meta_file = f"{department_id}.meta.json"
+        self._upload_to_s3(index_path, index_file)
+        self._upload_to_s3(meta_path, meta_file)
 
     def add_vectors(
         self,

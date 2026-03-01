@@ -44,6 +44,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate limiting
+from .middleware.rate_limit import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware)
+
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(chat_router.router, prefix="/api", tags=["chat"])
 app.include_router(documents_router.router, prefix="/api", tags=["documents"])

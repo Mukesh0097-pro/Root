@@ -74,7 +74,25 @@ export function useAdminUsers(departmentId: string) {
     await refresh();
   };
 
-  return { users, isLoading, refresh, inviteUser, updateUser };
+  const resendInvite = async (userId: string) => {
+    const result = await api.fetch<{ temp_password: string }>(`/admin/users/${userId}/resend-invite`, {
+      method: 'POST',
+    });
+    return result;
+  };
+
+  const importUsersCSV = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const result = await api.fetch<{ imported: number; errors: { row: number; error: string; email: string }[]; users: { email: string; temp_password: string }[] }>(
+      `/admin/users/import-csv?department_id=${departmentId}`,
+      { method: 'POST', body: formData },
+    );
+    await refresh();
+    return result;
+  };
+
+  return { users, isLoading, refresh, inviteUser, updateUser, resendInvite, importUsersCSV };
 }
 
 export function useAnalytics(departmentId: string, period: string = '30d') {
@@ -111,4 +129,29 @@ export function useAnalytics(departmentId: string, period: string = '30d') {
   }, [departmentId, period]);
 
   return { data, isLoading };
+}
+
+interface KnowledgeGap {
+  query: string;
+  confidence: number;
+  timestamp: string;
+}
+
+export function useKnowledgeGaps(departmentId: string) {
+  const [gaps, setGaps] = useState<KnowledgeGap[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!departmentId) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    api.fetch<KnowledgeGap[]>(`/admin/knowledge-gaps?department_id=${departmentId}`)
+      .then(setGaps)
+      .catch(() => setGaps([]))
+      .finally(() => setIsLoading(false));
+  }, [departmentId]);
+
+  return { gaps, isLoading };
 }

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, MessageSquare, Pencil, Trash2, Check, X, Search, Star } from 'lucide-react';
 import type { ConversationGroup } from '../../lib/types';
 import { DepartmentSelector } from '../common/DepartmentSelector';
 
@@ -11,6 +11,7 @@ interface ChatSidebarProps {
   onDepartmentChange: (id: string) => void;
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onStar: (id: string) => Promise<void>;
 }
 
 export function ChatSidebar({
@@ -20,10 +21,26 @@ export function ChatSidebar({
   onDepartmentChange,
   onRename,
   onDelete,
+  onStar,
 }: ChatSidebarProps) {
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter conversations by search query
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery.trim()) return groups;
+    const q = searchQuery.toLowerCase();
+    return groups
+      .map((group) => ({
+        ...group,
+        conversations: group.conversations.filter((conv) =>
+          conv.title.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((group) => group.conversations.length > 0);
+  }, [groups, searchQuery]);
 
   const startEdit = (id: string, currentTitle: string) => {
     setEditingId(id);
@@ -58,14 +75,29 @@ export function ChatSidebar({
         <DepartmentSelector value={departmentId} onChange={onDepartmentChange} />
       </div>
 
+      {/* Search */}
+      <div className="px-4 py-2 border-b border-white/10">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-root-muted" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search conversations..."
+            className="w-full bg-root-bg/50 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:border-root-accent/50 focus:outline-none transition-colors"
+          />
+        </div>
+      </div>
+
       {/* Conversation List */}
       <div className="flex-1 overflow-y-auto p-3" data-lenis-prevent>
-        {groups.length === 0 ? (
+        {filteredGroups.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-root-muted text-sm">No conversations yet</p>
+            <p className="text-root-muted text-sm">
+              {searchQuery ? 'No matching conversations' : 'No conversations yet'}
+            </p>
           </div>
         ) : (
-          groups.map((group) => (
+          filteredGroups.map((group) => (
             <div key={group.label} className="mb-4">
               <h3 className="text-xs font-bold text-root-muted uppercase tracking-wider px-2 mb-2">
                 {group.label}
@@ -106,6 +138,12 @@ export function ChatSidebar({
                           <span className="text-sm text-root-text truncate">{conv.title}</span>
                         </button>
                         <div className="hidden group-hover:flex items-center gap-0.5 absolute right-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onStar(conv.id); }}
+                            className={`p-1 rounded hover:bg-white/10 ${conv.is_starred ? 'text-yellow-400' : 'text-root-muted hover:text-yellow-400'}`}
+                          >
+                            <Star size={12} fill={conv.is_starred ? 'currentColor' : 'none'} />
+                          </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); startEdit(conv.id, conv.title); }}
                             className="p-1 rounded hover:bg-white/10 text-root-muted hover:text-white"

@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
-import { ThumbsUp, ThumbsDown, Copy, Check, Network } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Copy, Check, Network, Share2, AlertTriangle } from 'lucide-react';
 import type { ChatMessage as ChatMessageType } from '../../lib/types';
 import { MarkdownRenderer } from '../common/MarkdownRenderer';
 import { SourcePreview } from './SourcePreview';
 import { api } from '../../lib/api';
+
+const FEEDBACK_OPTIONS = [
+  'Incorrect information',
+  'Missing important details',
+  'Sources not relevant',
+  "Didn't answer my question",
+  'Too technical / Too simple',
+  'Other',
+];
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -12,8 +21,12 @@ interface ChatMessageProps {
 export function ChatMessage({ message }: ChatMessageProps) {
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(message.feedback);
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [reported, setReported] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
-  const [feedbackDetails, setFeedbackDetails] = useState('');
+  const [feedbackChecks, setFeedbackChecks] = useState<string[]>([]);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   const isUser = message.role === 'user';
 
@@ -21,6 +34,32 @@ export function ChatMessage({ message }: ChatMessageProps) {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/app/chat/${message.conversation_id}`;
+    await navigator.clipboard.writeText(url);
+    setShared(true);
+    setTimeout(() => setShared(false), 2000);
+  };
+
+  const handleReport = async () => {
+    if (message.id.startsWith('temp-') || reported) return;
+    try {
+      await api.fetch(`/chat/messages/${message.id}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify({ feedback: 'down', details: JSON.stringify({ reasons: ['Reported by user'], comment: 'Message reported' }) }),
+      });
+    } catch { /* silent */ }
+    setReported(true);
+  };
+
+  const toggleFeedbackCheck = (option: string) => {
+    setFeedbackChecks((prev) =>
+      prev.includes(option)
+        ? prev.filter((o) => o !== option)
+        : [...prev, option]
+    );
   };
 
   const handleFeedback = async (type: 'up' | 'down') => {
@@ -40,14 +79,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   const submitDetailedFeedback = async () => {
     if (message.id.startsWith('temp-')) return;
+    const details = JSON.stringify({
+      reasons: feedbackChecks,
+      comment: feedbackText,
+    });
     try {
       await api.fetch(`/chat/messages/${message.id}/feedback`, {
         method: 'POST',
-        body: JSON.stringify({ feedback: 'down', details: feedbackDetails }),
+        body: JSON.stringify({ feedback: 'down', details }),
       });
     } catch { /* silent */ }
     setShowFeedbackForm(false);
-    setFeedbackDetails('');
+    setFeedbackSubmitted(true);
+    setFeedbackChecks([]);
+    setFeedbackText('');
   };
 
   return (
@@ -128,19 +173,25 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="flex items-center gap-2 mt-3 pt-2 border-t border-white/5">
             <button
               onClick={() => handleFeedback('up')}
-              className={`p-1.5 rounded-lg transition-colors ${feedback === 'up' ? 'bg-green-500/20 text-green-400' : 'text-root-muted hover:text-white hover:bg-white/5'
+              className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg transition-colors ${feedback === 'up' ? 'bg-green-500/20 text-green-400' : 'text-root-muted hover:text-white hover:bg-white/5'
                 }`}
               aria-label="Helpful"
             >
               <ThumbsUp size={14} />
+              {feedback === 'up' && (
+                <span className="text-xs">Helpful</span>
+              )}
             </button>
             <button
               onClick={() => handleFeedback('down')}
-              className={`p-1.5 rounded-lg transition-colors ${feedback === 'down' ? 'bg-red-500/20 text-red-400' : 'text-root-muted hover:text-white hover:bg-white/5'
+              className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg transition-colors ${feedback === 'down' ? 'bg-red-500/20 text-red-400' : 'text-root-muted hover:text-white hover:bg-white/5'
                 }`}
               aria-label="Not helpful"
             >
               <ThumbsDown size={14} />
+              {feedback === 'down' && (
+                <span className="text-xs">Not helpful</span>
+              )}
             </button>
             <button
               onClick={handleCopy}
@@ -149,34 +200,73 @@ export function ChatMessage({ message }: ChatMessageProps) {
             >
               {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
             </button>
+            <button
+              onClick={handleShare}
+              className="p-1.5 rounded-lg text-root-muted hover:text-white hover:bg-white/5 transition-colors"
+              aria-label="Share conversation"
+            >
+              {shared ? <Check size={14} className="text-green-400" /> : <Share2 size={14} />}
+            </button>
+            <button
+              onClick={handleReport}
+              className={`p-1.5 rounded-lg transition-colors ${reported ? 'text-orange-400 bg-orange-500/10' : 'text-root-muted hover:text-orange-400 hover:bg-orange-500/10'}`}
+              aria-label="Report message"
+              disabled={reported}
+            >
+              <AlertTriangle size={14} />
+            </button>
           </div>
         )}
 
-        {/* Detailed feedback form */}
+        {/* Detailed feedback form — checklist */}
         {showFeedbackForm && (
           <div className="mt-3 pt-3 border-t border-white/5">
-            <p className="text-xs text-root-muted mb-2">What was wrong with this response?</p>
+            <p className="text-xs font-bold text-root-muted mb-3">What was wrong with this response?</p>
+            <div className="flex flex-col gap-2 mb-3">
+              {FEEDBACK_OPTIONS.map((option) => (
+                <label key={option} className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={feedbackChecks.includes(option)}
+                    onChange={() => toggleFeedbackCheck(option)}
+                    className="w-3.5 h-3.5 rounded border-white/20 bg-root-bg text-root-accent focus:ring-root-accent/50 accent-root-accent"
+                  />
+                  <span className="text-sm text-root-text group-hover:text-white transition-colors">
+                    {option}
+                  </span>
+                </label>
+              ))}
+            </div>
             <textarea
-              value={feedbackDetails}
-              onChange={(e) => setFeedbackDetails(e.target.value)}
-              placeholder="Tell us what could be improved..."
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Additional comments (optional)..."
               className="w-full bg-root-bg border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:border-root-accent/50 focus:outline-none resize-none"
               rows={2}
             />
             <div className="flex gap-2 mt-2">
               <button
                 onClick={submitDetailedFeedback}
-                className="px-3 py-1.5 bg-root-accent text-root-bg text-xs font-bold rounded-lg hover:bg-white transition-colors"
+                disabled={feedbackChecks.length === 0}
+                className="px-3 py-1.5 bg-root-accent text-root-bg text-xs font-bold rounded-lg hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit
+                Submit Feedback
               </button>
               <button
-                onClick={() => setShowFeedbackForm(false)}
+                onClick={() => { setShowFeedbackForm(false); setFeedbackChecks([]); setFeedbackText(''); }}
                 className="px-3 py-1.5 text-xs text-root-muted hover:text-white transition-colors"
               >
                 Cancel
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Feedback submitted confirmation */}
+        {feedbackSubmitted && !showFeedbackForm && feedback === 'down' && (
+          <div className="mt-2 text-xs text-root-muted">
+            <Check size={12} className="inline mr-1 text-green-400" />
+            Thanks for your feedback
           </div>
         )}
       </div>

@@ -9,6 +9,7 @@ interface UseConversationsReturn {
   createConversation: () => void;
   renameConversation: (id: string, title: string) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
+  starConversation: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -50,6 +51,11 @@ export function useConversations(departmentId: string): UseConversationsReturn {
     await refresh();
   };
 
+  const starConversation = async (id: string) => {
+    await api.fetch(`/conversations/${id}/star`, { method: 'PATCH' });
+    await refresh();
+  };
+
   const groups = groupConversations(conversations);
 
   return {
@@ -59,6 +65,7 @@ export function useConversations(departmentId: string): UseConversationsReturn {
     createConversation,
     renameConversation,
     deleteConversation,
+    starConversation,
     refresh,
   };
 }
@@ -70,6 +77,7 @@ function groupConversations(conversations: Conversation[]): ConversationGroup[] 
   const lastWeek = new Date(today.getTime() - 7 * 86400000);
 
   const groups: ConversationGroup[] = [
+    { label: 'Starred', conversations: [] },
     { label: 'Today', conversations: [] },
     { label: 'Yesterday', conversations: [] },
     { label: 'Last 7 Days', conversations: [] },
@@ -77,15 +85,19 @@ function groupConversations(conversations: Conversation[]): ConversationGroup[] 
   ];
 
   for (const conv of conversations) {
+    if (conv.is_starred) {
+      groups[0].conversations.push(conv);
+      continue;
+    }
     const date = new Date(conv.updated_at);
     if (date >= today) {
-      groups[0].conversations.push(conv);
-    } else if (date >= yesterday) {
       groups[1].conversations.push(conv);
-    } else if (date >= lastWeek) {
+    } else if (date >= yesterday) {
       groups[2].conversations.push(conv);
-    } else {
+    } else if (date >= lastWeek) {
       groups[3].conversations.push(conv);
+    } else {
+      groups[4].conversations.push(conv);
     }
   }
 

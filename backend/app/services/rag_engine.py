@@ -2,8 +2,11 @@ import json
 from typing import AsyncGenerator
 
 import google.generativeai as genai
+from sqlalchemy import select
 
 from ..config import settings
+from ..database import async_session
+from ..models.db import Document
 from .embeddings import EmbeddingService
 from .vector_store import vector_store
 from .federated_router import federated_router
@@ -14,6 +17,34 @@ class RAGEngine:
         self.embeddings = EmbeddingService()
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model = genai.GenerativeModel("gemini-2.0-flash")
+
+    async def _filter_accessible_chunks(self, results: list[dict]) -> list[dict]:
+        """Filter out chunks from archived or errored documents."""
+        if not results:
+            return results
+        doc_ids = list(set(r.get("document_id", "") for r in results if r.get("document_id")))
+        if not doc_ids:
+            return results
+
+        import uuid as uuid_mod
+        async with async_session() as db:
+            result = await db.execute(
+                select(Document.id, Document.is_archived, Document.status)
+                .where(Document.id.in_([uuid_mod.UUID(did) for did in doc_ids]))
+            )
+            doc_statuses = {str(row.id): row for row in result}
+
+        filtered = []
+        for r in results:
+            did = r.get("document_id", "")
+            doc_info = doc_statuses.get(did)
+            if doc_info is None:
+                filtered.append(r)
+                continue
+            if doc_info.is_archived or doc_info.status != "ready":
+                continue
+            filtered.append(r)
+        return filtered
 
     async def query_stream(
         self,
@@ -66,6 +97,9 @@ class RAGEngine:
             for r in results:
                 r["department_id"] = department_id
                 r["department_name"] = ""
+
+        # Filter out chunks from archived or errored documents
+        results = await self._filter_accessible_chunks(results)
 
         # 3. Build context from retrieved chunks
         if not results:
@@ -127,7 +161,7 @@ class RAGEngine:
         # Build conversation context
         messages_context = ""
         if conversation_history:
-            recent = conversation_history[-6:]  # Last 3 exchanges
+            recent = conversation_history[-20:]  # Last 10 exchanges
             for msg in recent:
                 role_label = "User" if msg["role"] == "user" else "Assistant"
                 messages_context += f"{role_label}: {msg['content']}\n\n"

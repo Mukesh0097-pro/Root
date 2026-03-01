@@ -35,6 +35,7 @@ export interface Conversation {
   id: string;
   title: string;
   department_id: string;
+  is_starred: boolean;
   created_at: string;
   updated_at: string;
   message_count: number;
@@ -83,6 +84,7 @@ export interface DocumentItem {
   status: 'processing' | 'ready' | 'error';
   chunk_count: number;
   error_message: string | null;
+  is_archived: boolean;
   created_at: string;
 }
 

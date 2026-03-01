@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Upload } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDocuments } from '../hooks/useDocuments';
@@ -13,12 +13,31 @@ export default function AdminDocuments() {
   const [showUploader, setShowUploader] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
-  const filtered = documents.filter((d) => {
-    if (statusFilter && d.status !== statusFilter) return false;
-    if (search && !d.title.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = useMemo(() => {
+    let result = documents.filter((d) => {
+      if (statusFilter && d.status !== statusFilter) return false;
+      if (search && !d.title.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    });
+
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'name':
+          return a.title.localeCompare(b.title);
+        case 'size':
+          return b.file_size - a.file_size;
+        case 'newest':
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+
+    return result;
+  }, [documents, statusFilter, search, sortBy]);
 
   const handleUpload = async (file: File, meta: { title: string; description?: string; category?: string; tags?: string }) => {
     await uploadDocument(file, meta, departmentId);
@@ -57,6 +76,16 @@ export default function AdminDocuments() {
           <option value="ready">Ready</option>
           <option value="processing">Processing</option>
           <option value="error">Error</option>
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="bg-root-bg border border-white/10 rounded-lg px-3 py-2 text-sm text-root-text focus:outline-none"
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="name">Name (A-Z)</option>
+          <option value="size">Size (Largest)</option>
         </select>
       </div>
 

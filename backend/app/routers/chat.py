@@ -1,5 +1,6 @@
 import json
 import uuid as uuid_mod
+import time
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -75,6 +76,7 @@ async def chat(
         full_response = ""
         sources_data = []
         confidence_val = 0.0
+        start_time = time.time()
 
         async for event in rag_engine.query_stream(
             question=req.message,
@@ -96,6 +98,8 @@ async def chat(
 
             yield {"event": evt, "data": data}
 
+        elapsed_ms = int((time.time() - start_time) * 1000)
+
         # Save assistant message to DB
         assistant_msg = ChatMessage(
             conversation_id=conversation_id,
@@ -103,6 +107,7 @@ async def chat(
             content=full_response,
             sources_json=json.dumps(sources_data),
             confidence=confidence_val,
+            response_time_ms=elapsed_ms,
         )
         db.add(assistant_msg)
 
@@ -154,6 +159,7 @@ async def list_conversations(
             id=conv.id,
             title=conv.title,
             department_id=conv.department_id,
+            is_starred=conv.is_starred,
             created_at=conv.created_at,
             updated_at=conv.updated_at,
             message_count=msg_count,
@@ -221,6 +227,27 @@ async def rename_conversation(
     conversation.title = req.title
     await db.commit()
     return {"status": "ok"}
+
+
+@router.patch("/conversations/{conversation_id}/star")
+async def star_conversation(
+    conversation_id: uuid_mod.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    conversation = result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conversation.is_starred = not conversation.is_starred
+    await db.commit()
+    return {"status": "ok", "is_starred": conversation.is_starred}
 
 
 @router.delete("/conversations/{conversation_id}")

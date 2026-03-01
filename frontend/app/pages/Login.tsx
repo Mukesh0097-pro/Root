@@ -238,6 +238,11 @@ export default function Login() {
             </Link>
           </p>
           <p className="text-root-muted text-sm">
+            <Link to="/app/forgot-password" className="text-root-accent hover:underline">
+              Forgot your password?
+            </Link>
+          </p>
+          <p className="text-root-muted text-sm">
             <a href="/" className="text-root-accent hover:underline">Back to website</a>
           </p>
         </div>

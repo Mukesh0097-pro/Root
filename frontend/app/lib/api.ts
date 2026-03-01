@@ -108,6 +108,27 @@ class ApiClient {
     }
   }
 
+  async rawFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(options.headers);
+    const token = this.getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    let res = await fetch(`${BASE}${url}`, { ...options, headers });
+
+    if (res.status === 401) {
+      const refreshed = await this.refreshToken();
+      if (refreshed) {
+        headers.set('Authorization', `Bearer ${this.getToken()}`);
+        res = await fetch(`${BASE}${url}`, { ...options, headers });
+      }
+    }
+
+    if (!res.ok) {
+      throw new ApiError(res.status, 'Request failed');
+    }
+    return res;
+  }
+
   async uploadFile(url: string, formData: FormData): Promise<unknown> {
     const token = this.getToken();
     const headers: Record<string, string> = {};

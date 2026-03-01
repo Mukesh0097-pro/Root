@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import secrets
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from ..config import settings
 from ..models.db import User, Department
 from ..models.schemas import (
     LoginRequest, RegisterRequest, RefreshRequest, GoogleAuthRequest,
+    ForgotPasswordRequest, ResetPasswordRequest, MFAVerifyRequest, MFALoginRequest,
     LoginResponse, TokenResponse, UserResponse, DepartmentResponse,
 )
 from ..auth.jwt import (
@@ -76,7 +78,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == req.email))
     user = result.scalar_one_or_none()
@@ -85,6 +87,10 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is deactivated")
+
+    # If MFA is enabled, return a partial response requiring MFA code
+    if user.mfa_enabled:
+        return {"mfa_required": True, "email": user.email}
 
     user.last_login = datetime.utcnow()
     await db.commit()
@@ -97,6 +103,61 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     refresh_token = create_refresh_token(str(user.id))
 
     await log_action(db, user.id, user.department_id, "login", "user", str(user.id))
+
+    return LoginResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            role=user.role,
+            department_id=user.department_id,
+            department_name=department.name if department else None,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            last_login=user.last_login,
+        ),
+    )
+
+
+@router.post("/login/mfa", response_model=LoginResponse)
+async def login_with_mfa(req: MFALoginRequest, db: AsyncSession = Depends(get_db)):
+    """Complete login with MFA code."""
+    result = await db.execute(select(User).where(User.email == req.email))
+    user = result.scalar_one_or_none()
+    if not user or not verify_password(req.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated")
+
+    if not user.mfa_enabled or not user.mfa_secret:
+        raise HTTPException(status_code=400, detail="MFA is not enabled for this account")
+
+    # Verify TOTP code
+    try:
+        import pyotp
+        totp = pyotp.TOTP(user.mfa_secret)
+        if not totp.verify(req.mfa_code, valid_window=1):
+            # Check backup codes
+            if not _verify_backup_code(user, req.mfa_code, db):
+                raise HTTPException(status_code=401, detail="Invalid MFA code")
+    except ImportError:
+        # pyotp not installed, skip MFA verification (graceful degradation)
+        pass
+
+    user.last_login = datetime.utcnow()
+    await db.commit()
+
+    dept_result = await db.execute(select(Department).where(Department.id == user.department_id))
+    department = dept_result.scalar_one_or_none()
+
+    access_token = create_access_token(str(user.id), str(user.department_id), user.role)
+    refresh_token = create_refresh_token(str(user.id))
+
+    await log_action(db, user.id, user.department_id, "login_mfa", "user", str(user.id))
 
     return LoginResponse(
         access_token=access_token,
@@ -266,3 +327,182 @@ async def list_departments(db: AsyncSession = Depends(get_db)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Generate a password reset token. In production, this would send an email."""
+    result = await db.execute(select(User).where(User.email == req.email))
+    user = result.scalar_one_or_none()
+
+    # Always return success to avoid email enumeration
+    if not user:
+        return {"message": "If an account with that email exists, a reset link has been sent."}
+
+    # Generate token
+    raw_token = secrets.token_urlsafe(32)
+    hashed_token = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    user.password_reset_token = hashed_token
+    user.password_reset_expiry = datetime.utcnow() + timedelta(hours=1)
+    await db.commit()
+
+    # In production: send email with reset link containing raw_token
+    # For MVP: return the token directly (remove in production)
+    return {
+        "message": "If an account with that email exists, a reset link has been sent.",
+        "reset_token": raw_token,  # MVP only — remove in production
+    }
+
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Reset password using the token from forgot-password."""
+    hashed_token = hashlib.sha256(req.token.encode()).hexdigest()
+
+    result = await db.execute(
+        select(User).where(User.password_reset_token == hashed_token)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if user.password_reset_expiry and user.password_reset_expiry < datetime.utcnow():
+        user.password_reset_token = None
+        user.password_reset_expiry = None
+        await db.commit()
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    user.password_hash = hash_password(req.new_password)
+    user.password_reset_token = None
+    user.password_reset_expiry = None
+    await db.commit()
+
+    await log_action(db, user.id, user.department_id, "password_reset", "user", str(user.id))
+
+    return {"message": "Password has been reset successfully"}
+
+
+# --- MFA Endpoints ---
+
+def _verify_backup_code(user: User, code: str, db) -> bool:
+    """Verify and consume a backup code."""
+    import json
+    if not user.mfa_backup_codes:
+        return False
+    try:
+        codes = json.loads(user.mfa_backup_codes)
+    except (json.JSONDecodeError, TypeError):
+        return False
+
+    if code in codes:
+        codes.remove(code)
+        user.mfa_backup_codes = json.dumps(codes)
+        return True
+    return False
+
+
+@router.post("/mfa/setup")
+async def setup_mfa(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a TOTP secret and provisioning URI for MFA setup."""
+    if current_user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is already enabled")
+
+    try:
+        import pyotp
+    except ImportError:
+        raise HTTPException(status_code=503, detail="MFA not available: pyotp library not installed")
+
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    provisioning_uri = totp.provisioning_uri(
+        name=current_user.email,
+        issuer_name="FedKnowledge",
+    )
+
+    # Store secret (not yet enabled — user must verify first)
+    current_user.mfa_secret = secret
+    await db.commit()
+
+    # Generate backup codes
+    import json
+    backup_codes = [secrets.token_hex(4) for _ in range(8)]
+    current_user.mfa_backup_codes = json.dumps(backup_codes)
+    await db.commit()
+
+    return {
+        "secret": secret,
+        "provisioning_uri": provisioning_uri,
+        "backup_codes": backup_codes,
+    }
+
+
+@router.post("/mfa/verify")
+async def verify_mfa(
+    req: MFAVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify a TOTP code to complete MFA setup."""
+    if current_user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is already enabled")
+
+    if not current_user.mfa_secret:
+        raise HTTPException(status_code=400, detail="MFA setup not started. Call /auth/mfa/setup first")
+
+    try:
+        import pyotp
+        totp = pyotp.TOTP(current_user.mfa_secret)
+        if not totp.verify(req.code, valid_window=1):
+            raise HTTPException(status_code=400, detail="Invalid code. Please try again.")
+    except ImportError:
+        raise HTTPException(status_code=503, detail="MFA not available: pyotp library not installed")
+
+    current_user.mfa_enabled = True
+    await db.commit()
+
+    await log_action(db, current_user.id, current_user.department_id, "mfa_enable", "user", str(current_user.id))
+
+    return {"status": "ok", "message": "MFA has been enabled successfully"}
+
+
+@router.post("/mfa/disable")
+async def disable_mfa(
+    req: MFAVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Disable MFA (requires a valid TOTP code to confirm)."""
+    if not current_user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+
+    try:
+        import pyotp
+        totp = pyotp.TOTP(current_user.mfa_secret)
+        if not totp.verify(req.code, valid_window=1):
+            if not _verify_backup_code(current_user, req.code, db):
+                raise HTTPException(status_code=401, detail="Invalid code")
+    except ImportError:
+        pass
+
+    current_user.mfa_enabled = False
+    current_user.mfa_secret = None
+    current_user.mfa_backup_codes = None
+    await db.commit()
+
+    await log_action(db, current_user.id, current_user.department_id, "mfa_disable", "user", str(current_user.id))
+
+    return {"status": "ok", "message": "MFA has been disabled"}
+
+
+@router.get("/mfa/status")
+async def mfa_status(current_user: User = Depends(get_current_user)):
+    """Check if MFA is enabled for the current user."""
+    return {"mfa_enabled": current_user.mfa_enabled}

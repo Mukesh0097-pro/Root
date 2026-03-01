@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FileText, Users, BarChart3, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, BarChart3, ArrowLeft, Building2 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 const ADMIN_NAV = [
   { label: 'Dashboard', href: '/app/admin', icon: LayoutDashboard, end: true },
@@ -11,6 +12,8 @@ const ADMIN_NAV = [
 
 export function AdminLayout() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isCompanyAdmin = user?.role === 'company_admin';
 
   return (
     <div className="flex h-full">
@@ -43,6 +46,24 @@ export function AdminLayout() {
               {item.label}
             </NavLink>
           ))}
+          {isCompanyAdmin && (
+            <>
+              <div className="my-2 border-t border-white/10" />
+              <NavLink
+                to="/app/admin/company"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-root-accent/10 text-root-accent'
+                      : 'text-root-muted hover:text-white hover:bg-white/5'
+                  }`
+                }
+              >
+                <Building2 size={18} />
+                Company
+              </NavLink>
+            </>
+          )}
         </nav>
       </aside>
 

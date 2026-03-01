@@ -19,6 +19,8 @@ import { ToastProvider } from './app/components/common/Toast';
 import { ProtectedRoute } from './app/components/common/ProtectedRoute';
 import Login from './app/pages/Login';
 import Signup from './app/pages/Signup';
+import ForgotPassword from './app/pages/ForgotPassword';
+import ResetPassword from './app/pages/ResetPassword';
 import { AppLayout } from './app/layouts/AppLayout';
 import { AdminLayout } from './app/layouts/AdminLayout';
 import Chat from './app/pages/Chat';
@@ -26,6 +28,7 @@ import AdminDashboard from './app/pages/AdminDashboard';
 import AdminDocuments from './app/pages/AdminDocuments';
 import AdminUsers from './app/pages/AdminUsers';
 import AdminAnalytics from './app/pages/AdminAnalytics';
+import CompanyDashboard from './app/pages/CompanyDashboard';
 import Billing from './app/pages/Billing';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -115,6 +118,8 @@ function App() {
             </ToastProvider>
           </AuthProvider>
         } />
+        <Route path="/app/forgot-password" element={<ForgotPassword />} />
+        <Route path="/app/reset-password" element={<ResetPassword />} />
         <Route path="/app" element={
           <AuthProvider>
             <ToastProvider>
@@ -133,6 +138,7 @@ function App() {
             <Route path="documents" element={<AdminDocuments />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="company" element={<CompanyDashboard />} />
           </Route>
         </Route>
 

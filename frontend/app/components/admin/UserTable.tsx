@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { User } from '../../lib/types';
 
 interface UserTableProps {
   users: User[];
   onDeactivate: (userId: string, isActive: boolean) => void;
   onChangeRole: (userId: string, role: string) => void;
+  onResendInvite?: (userId: string) => Promise<{ temp_password: string }>;
 }
 
 const ROLE_BADGES: Record<string, { label: string; color: string }> = {
@@ -13,7 +14,17 @@ const ROLE_BADGES: Record<string, { label: string; color: string }> = {
   employee: { label: 'Employee', color: 'bg-white/10 text-root-muted' },
 };
 
-export function UserTable({ users, onDeactivate, onChangeRole }: UserTableProps) {
+export function UserTable({ users, onDeactivate, onChangeRole, onResendInvite }: UserTableProps) {
+  const [resendResult, setResendResult] = useState<{ userId: string; password: string } | null>(null);
+
+  const handleResend = async (userId: string) => {
+    if (!onResendInvite) return;
+    try {
+      const result = await onResendInvite(userId);
+      setResendResult({ userId, password: result.temp_password });
+    } catch { /* silent */ }
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -76,7 +87,20 @@ export function UserTable({ users, onDeactivate, onChangeRole }: UserTableProps)
                     >
                       {user.is_active ? 'Deactivate' : 'Activate'}
                     </button>
+                    {!user.last_login && onResendInvite && (
+                      <button
+                        onClick={() => handleResend(user.id)}
+                        className="px-2 py-1 rounded text-xs font-bold text-blue-400 hover:bg-blue-500/10 transition-colors"
+                      >
+                        Resend
+                      </button>
+                    )}
                   </div>
+                  {resendResult?.userId === user.id && (
+                    <div className="mt-1 px-2 py-1 bg-blue-500/10 rounded text-xs text-blue-300">
+                      New password: <code className="font-mono">{resendResult.password}</code>
+                    </div>
+                  )}
                 </td>
               </tr>
             );
